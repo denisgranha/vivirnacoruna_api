@@ -53,7 +53,7 @@ function wpse18703_posts_where( $where, &$wp_query )
 add_action('parse_request', 'custom_requests');
 function custom_requests ( $wp ) {
 
-    $valid_actions = array('today', 'event', 'categories','prices','search','interval');
+    $valid_actions = array('today', 'event', 'categories','prices','search','interval','day');
 
     if(
         !empty($wp->query_vars['api_action']) &&
@@ -69,34 +69,61 @@ function custom_requests ( $wp ) {
          * Todos los eventos del día
          */
         if($wp->query_vars['api_action'] == 'today'){
-            $today = strtotime("today");
+            $start = strtotime("today");
 
-            $tomorrow = strtotime("tomorrow");
+            $end = strtotime("tomorrow");
 
 
 
             $query =  array(
                 'post_type' => 'ajde_events',
                 'meta_query' => array(
+
+                        array(
+                            'key' => 'evcal_srow',
+                            'value' => $start,
+                            'compare' => ">="
+                        ),
+                        array(
+                            'key' => 'evcal_erow',
+                            'value' => $end,
+                            'compare' => "<="
+                        )
+                )
+
+            );
+
+            $query_long_events = array(
+                'post_type' =>  'ajde_events',
+                'meta_query' => array(
                     array(
                         'key' => 'evcal_srow',
-                        'value' => $today,
-                        'compare' => ">="
+                        'value' => $start,
+                        'compare' => "<"
                     ),
                     array(
                         'key' => 'evcal_erow',
-                        'value' => $tomorrow,
-                        'compare' => "<="
+                        'value' => $end,
+                        'compare' => ">"
                     )
                 )
             );
 
 
             $query = new WP_Query($query);
-            $eventos = $query->get_posts(
+            $today_events = $query->get_posts(
                 array(
                     'posts_per_page'   => 50)
             );
+
+            $query_long_events = new WP_Query($query_long_events);
+            $long_events = $query_long_events->get_posts(
+                array(
+                    'posts_per_page'   => 50)
+            );
+
+            $eventos = array_merge($today_events,$long_events);
+
             foreach($eventos as $evento){
                 $evento->end_date = get_post_meta($evento->ID,"evcal_erow",true);
                 $evento->start_date = get_post_meta($evento->ID,"evcal_srow",true);
@@ -150,7 +177,8 @@ function custom_requests ( $wp ) {
             $categories = array();
             $childs = array();
 
-            $excluded = array(297,1170,272,255,269,335);
+            //no usado
+            //$excluded = array(297,1170,272,255,269,335);
 
             foreach(get_terms( array("category")) as $category){
                 if($category->parent == 0){
@@ -177,7 +205,14 @@ function custom_requests ( $wp ) {
          * Tipos de Prezos de evento
          */
         if($wp->query_vars['api_action'] == 'prices'){
-            wp_send_json(get_terms( array("event_type_2")));
+            $prices = array();
+            foreach(get_terms( array("event_type_2")) as $price){
+                $prices[$price->term_id] = $price;
+            }
+
+            wp_send_json(
+                $prices
+            );
         }
 
         /**
@@ -244,6 +279,7 @@ function custom_requests ( $wp ) {
             $query =  array(
                 'post_type' => 'ajde_events',
                 'meta_query' => array(
+
                     array(
                         'key' => 'evcal_srow',
                         'value' => $start,
@@ -255,15 +291,40 @@ function custom_requests ( $wp ) {
                         'compare' => "<="
                     )
                 )
+
+            );
+
+            $query_long_events = array(
+                'post_type' =>  'ajde_events',
+                'meta_query' => array(
+                    array(
+                        'key' => 'evcal_srow',
+                        'value' => $start,
+                        'compare' => "<"
+                    ),
+                    array(
+                        'key' => 'evcal_erow',
+                        'value' => $end,
+                        'compare' => ">"
+                    )
+                )
             );
 
 
             $query = new WP_Query($query);
-            $eventos = $query->get_posts(
+            $today_events = $query->get_posts(
                 array(
-                    'posts_per_page'   => 50
-                )
+                    'posts_per_page'   => 50)
             );
+
+            $query_long_events = new WP_Query($query_long_events);
+            $long_events = $query_long_events->get_posts(
+                array(
+                    'posts_per_page'   => 50)
+            );
+
+            $eventos = array_merge($today_events,$long_events);
+
             foreach($eventos as $evento){
                 $evento->end_date = get_post_meta($evento->ID,"evcal_erow",true);
                 $evento->start_date = get_post_meta($evento->ID,"evcal_srow",true);
@@ -283,7 +344,6 @@ function custom_requests ( $wp ) {
         }
 
 
-
-        }
+    }
 }
 
